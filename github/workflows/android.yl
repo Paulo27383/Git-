@@ -1,0 +1,55 @@
+name: Construir Ango App
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'Ango-App-APK.zip'
+      - '.github/workflows/android.yml'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Obter ficheiros
+        uses: actions/checkout@v4
+
+      - name: Preparar Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Descompactar projeto
+        run: |
+          mkdir -p app-source
+          unzip -o Ango-App-APK.zip -d app-source
+
+      - name: Localizar projeto Gradle
+        id: project
+        shell: bash
+        run: |
+          SETTINGS=$(find app-source \( -name settings.gradle.kts -o -name settings.gradle \) -print -quit)
+          if [ -z "$SETTINGS" ]; then
+            echo "Projeto Gradle não encontrado"
+            find app-source -maxdepth 5 -type f
+            exit 1
+          fi
+          PROJECT_DIR=$(dirname "$SETTINGS")
+          echo "dir=$PROJECT_DIR" >> "$GITHUB_OUTPUT"
+
+      - name: Instalar Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+
+      - name: Compilar APK
+        run: gradle -p "${{ steps.project.outputs.dir }}" assembleDebug
+
+      - name: Guardar APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Ango-App-APK
+          path: app-source/**/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
